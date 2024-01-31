@@ -1,0 +1,1 @@
+This is a tool that helps in diagnosing configuration issues of workloads running in Kubernetes. It looks for Pods that are in an error states, and collects their specs, along with associated resources like ConfigMaps, Secrets, ServiceAccounts, and PersistentVolumes. It is helpful in environments where interactive debugging is not possible, such as automated deployment pipelines.
