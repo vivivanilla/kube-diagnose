@@ -19,9 +19,12 @@ lazy val root = project
 
     graalVMNativeImageOptions ++= Seq(
       "--static",
-      "--no-fallback",
-      "--configure-reflection-metadata"
-    )
+      "--no-fallback"
+    ),
+
+    dockerUsername := Some("vivivanilla")
   )
 
 enablePlugins(GraalVMNativeImagePlugin)
+
+enablePlugins(DockerPlugin)
