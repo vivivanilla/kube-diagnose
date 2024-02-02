@@ -19,7 +19,8 @@ lazy val root = project
 
     graalVMNativeImageOptions ++= Seq(
       "--static",
-      "--no-fallback"
+      "--no-fallback",
+      "--configure-reflection-metadata"
     )
   )
 
