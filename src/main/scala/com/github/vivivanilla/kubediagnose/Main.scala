@@ -4,6 +4,7 @@ import cats.implicits._
 import cats.effect._
 import com.monovore.decline._
 import com.monovore.decline.effect._
+import io.kubernetes.client.util.Config
 
 object Main
     extends CommandIOApp(
@@ -14,13 +15,14 @@ object Main
 
   case class AllNamespaces()
   case class Namespaces(namespaces: List[String])
+  case class DiagnoseServiceAccount(name: String, namespace: String)
 
   val allNamespacesFlag =
     Opts
       .flag("all", short = "A", help = "Diagnose all namespaces.")
       .map(_ => AllNamespaces())
 
-  val namespaceOpts =
+  val namespacesOpts =
     Opts
       .options[String](
         "namespace",
@@ -29,18 +31,38 @@ object Main
         help = "Namespace to diagnose."
       )
       .withDefault(cats.data.NonEmptyList("default", List.empty))
-      .map(namespaces => Namespaces(namespaces.toList))
+
+  val serviceAccountOpts = Opts.option[String](
+    "service-account",
+    metavar = "sa",
+    help = "ServiceAccount to diagnose"
+  )
+
+  case class DiagnoseServiceAccountCmd(name: String, namespace: String)
+
+  val diagnoseServiceAccountCmd: Opts[DiagnoseServiceAccountCmd] =
+    (serviceAccountOpts, namespacesOpts.map(_.head))
+      .mapN(DiagnoseServiceAccountCmd.apply)
 
   override def main: Opts[IO[ExitCode]] =
-    (allNamespacesFlag orElse namespaceOpts).map {
-      case Namespaces(namespaces) =>
-        for {
-          diagnoser <- IO(new Diagnose())
-          diagnoses <- IO.parSequenceN(1)(
-            namespaces.map(diagnoser.diagnoseNamespace)
-          )
-          _ <- IO(println(MarkdownBlocks(diagnoses).rendered))
-        } yield ExitCode.Success
-      case AllNamespaces() => IO.pure(ExitCode.Success)
-    }
+    (diagnoseServiceAccountCmd orElse allNamespacesFlag orElse namespacesOpts
+      .map(ns => Namespaces(ns.toList)))
+      .map {
+        case Namespaces(namespaces) =>
+          for {
+            diagnoser <- IO(new Diagnose())
+            diagnoses <- IO.parSequenceN(1)(
+              namespaces.map(diagnoser.diagnoseNamespace)
+            )
+            _ <- IO(println(MarkdownBlocks(diagnoses).rendered))
+          } yield ExitCode.Success
+        case AllNamespaces() => IO.pure(ExitCode.Success)
+        case DiagnoseServiceAccountCmd(name, namespace) =>
+          for {
+            client <- IO.blocking(Config.defaultClient())
+            diagnoser <- ServiceAccountDiagnoser(name, namespace)(client)
+            diagnoses <- diagnoser.diagnose
+            _ <- IO(println(diagnoses.rendered))
+          } yield ExitCode.Success
+      }
 }
