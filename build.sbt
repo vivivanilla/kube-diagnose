@@ -22,7 +22,9 @@ lazy val root = project
       "--no-fallback"
     ),
 
-    dockerUsername := Some("vivivanilla")
+    dockerUsername := Some("vivivanilla"),
+
+    semanticdbEnabled := true
   )
 
 enablePlugins(GraalVMNativeImagePlugin)
