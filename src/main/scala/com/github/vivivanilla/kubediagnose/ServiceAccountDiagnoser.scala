@@ -54,14 +54,21 @@ class ServiceAccountDiagnoser(sa: V1ServiceAccount, val client: ApiClient) {
   val namespace = sa.getMetadata.getNamespace
 
   def diagnose: IO[Markdown] = for {
-    permissions <- showPermissions
+    permissions <- showPermissions.attempt
   } yield MarkdownBlocks(
     Seq(
       MarkdownHeading(s"ServiceAcount ${namespace}/${name}", 2),
       MarkdownParagraph("Specification:"),
       showSpec,
       MarkdownParagraph("Permissions:"),
-      permissions
+      permissions match {
+        case Left(e) =>
+          MarkdownAlert(
+            "WARNING",
+            MarkdownParagraph(s"Cannot read permissions: ${e.getMessage}")
+          )
+        case Right(permissions) => permissions
+      }
     )
   )
 
@@ -84,7 +91,12 @@ class ServiceAccountDiagnoser(sa: V1ServiceAccount, val client: ApiClient) {
           Seq(
             policy.namespace.getOrElse("*"),
             policy.verbs.mkString(", "),
-            policy.apiGroups.mkString(", "),
+            policy.apiGroups
+              .map {
+                case ""  => "core"
+                case any => any
+              }
+              .mkString(", "),
             policy.resources.mkString(", "),
             policy.resourceNames.mkString(", "),
             policy.nonResourceUrls.mkString(", ")
