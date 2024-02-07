@@ -1,7 +1,7 @@
 package com.github.vivivanilla.kubediagnose
 
-import cats.implicits._
 import cats.effect._
+import cats.implicits._
 import com.monovore.decline._
 import com.monovore.decline.effect._
 import io.kubernetes.client.util.Config
@@ -38,14 +38,26 @@ object Main
     help = "ServiceAccount to diagnose"
   )
 
+  val persistentVolumeClaimOpts = Opts.option[String](
+    "persistent-volume-claim",
+    metavar = "pvc",
+    help = "PersistentVolumeClaim to diagnose."
+  )
+
   case class DiagnoseServiceAccountCmd(name: String, namespace: String)
+
+  case class DiagnosePersistentVolumeClaimCmd(name: String, namespace: String)
 
   val diagnoseServiceAccountCmd: Opts[DiagnoseServiceAccountCmd] =
     (serviceAccountOpts, namespacesOpts.map(_.head))
       .mapN(DiagnoseServiceAccountCmd.apply)
 
+  val diagnosePersistentVolumeClaimCmd: Opts[DiagnosePersistentVolumeClaimCmd] =
+    (persistentVolumeClaimOpts, namespacesOpts.map(_.head))
+      .mapN(DiagnosePersistentVolumeClaimCmd.apply)
+
   override def main: Opts[IO[ExitCode]] =
-    (diagnoseServiceAccountCmd orElse allNamespacesFlag orElse namespacesOpts
+    (diagnoseServiceAccountCmd orElse diagnosePersistentVolumeClaimCmd orElse allNamespacesFlag orElse namespacesOpts
       .map(ns => Namespaces(ns.toList)))
       .map {
         case Namespaces(namespaces) =>
@@ -61,6 +73,15 @@ object Main
           for {
             client <- IO.blocking(Config.defaultClient())
             diagnoser <- ServiceAccountDiagnoser(name, namespace)(client)
+            diagnoses <- diagnoser.diagnose
+            _ <- IO(println(diagnoses.rendered))
+          } yield ExitCode.Success
+        case DiagnosePersistentVolumeClaimCmd(name, namespace) =>
+          for {
+            client <- IO.blocking(Config.defaultClient())
+            diagnoser <- PersistentVolumeClaimDiagnoser.byName(name, namespace)(
+              client
+            )
             diagnoses <- diagnoser.diagnose
             _ <- IO(println(diagnoses.rendered))
           } yield ExitCode.Success
