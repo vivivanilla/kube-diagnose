@@ -66,3 +66,8 @@ case class MarkdownHeading(content: String, level: Int) extends Markdown {
 case class MarkdownEmpty() extends Markdown {
   val rendered = ""
 }
+
+case class MarkdownUnorderedList(items: Seq[Markdown]) {
+  val rendered =
+    "* " + items.map(_.rendered).map(_.replace("\n", "\n  ")).mkString("\n* ")
+}
