@@ -26,7 +26,5 @@ lazy val root = project
 
     semanticdbEnabled := true
   )
-
-enablePlugins(GraalVMNativeImagePlugin)
-
-enablePlugins(DockerPlugin)
+  .enablePlugins(GraalVMNativeImagePlugin)
+  .enablePlugins(DockerPlugin)
