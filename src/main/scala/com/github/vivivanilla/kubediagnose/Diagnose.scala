@@ -1,21 +1,21 @@
 package com.github.vivivanilla.kubediagnose
 
-import io.kubernetes.client.util.Config
-import io.kubernetes.client.openapi.apis.{CoreV1Api, RbacAuthorizationV1Api}
-import io.kubernetes.client.openapi.ApiException
 import cats.effect.IO
-import scala.util.{Try, Success, Failure}
+import io.kubernetes.client.openapi.ApiException
+import io.kubernetes.client.openapi.apis.{CoreV1Api, RbacAuthorizationV1Api}
 import io.kubernetes.client.openapi.models.{
-  V1Pod,
-  V1ContainerStatus,
-  V1Secret,
   V1ConfigMap,
-  V1RoleBinding,
+  V1ContainerStatus,
+  V1Pod,
   V1Role,
+  V1RoleBinding,
+  V1Secret,
   V1ServiceAccount
 }
+import io.kubernetes.client.util.{Config, Yaml}
+
 import scala.jdk.CollectionConverters.*
-import io.kubernetes.client.util.Yaml;
+import scala.util.{Failure, Success, Try};
 
 class Diagnose() {
   val client = Config.defaultClient()
@@ -304,7 +304,7 @@ class Diagnose() {
           MarkdownAlert(
             "WARNING",
             MarkdownParagraph(
-              s"Could not find permissions for ServiceAccount ${name}: ${e.getMessage}"
+              s"Could not read permissions for ServiceAccount ${name}: ${e.getMessage}"
             )
           )
         case Right(permissions) =>

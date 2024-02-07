@@ -1,17 +1,17 @@
 package com.github.vivivanilla.kubediagnose
 
-import io.kubernetes.client.openapi.models.{
-  V1Pod,
-  V1RoleBinding,
-  V1Role,
-  V1ServiceAccount,
-  V1ClusterRoleBinding,
-  V1ClusterRole
-}
-import io.kubernetes.client.openapi.ApiClient
-import io.kubernetes.client.util.Yaml
 import cats.effect.IO
+import io.kubernetes.client.openapi.ApiClient
 import io.kubernetes.client.openapi.apis.{CoreV1Api, RbacAuthorizationV1Api}
+import io.kubernetes.client.openapi.models.{
+  V1ClusterRole,
+  V1ClusterRoleBinding,
+  V1Pod,
+  V1Role,
+  V1RoleBinding,
+  V1ServiceAccount
+}
+import io.kubernetes.client.util.Yaml
 
 case class PolicyRule(
     namespace: Option[String],
