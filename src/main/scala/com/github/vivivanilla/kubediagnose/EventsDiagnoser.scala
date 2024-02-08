@@ -17,28 +17,42 @@ object EventsDiagnoser {
       api <- IO(new CoreV1Api(client))
       eventList <- IO.blocking(
         api.listEventForAllNamespaces(
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null
+          null, null, null, null, null, null, null, null, null, null, null
         )
       )
       events <- IO(eventList.getItems).map(_.convertToScala)
     } yield {
       val relevantEvents = events.filter(event => {
         val obj = event.getInvolvedObject
-        obj.getApiVersion == apiVersion
+        obj != null
+        && obj.getApiVersion == apiVersion
         && obj.getKind == kind
         && obj.getName == name
         && obj.getNamespace == namespace
       })
+      new EventsDiagnoser(relevantEvents, client)
+    }
+
+  def allWithWarning(
+      namespace: Option[String]
+  )(implicit client: ApiClient): IO[EventsDiagnoser] =
+    for {
+      api <- IO(new CoreV1Api(client))
+      eventList <- IO.blocking(
+        api.listEventForAllNamespaces(
+          null, null, null, null, null, null, null, null, null, null, null
+        )
+      )
+      events <- IO(eventList.getItems).map(_.convertToScala)
+    } yield {
+      val relevantEvents = events.filter(event =>
+        event.getType == "Warning"
+          && (namespace match {
+            case Some(namespace) =>
+              event.getInvolvedObject != null && event.getInvolvedObject.getNamespace == namespace
+            case None => true
+          })
+      )
       new EventsDiagnoser(relevantEvents, client)
     }
 }
