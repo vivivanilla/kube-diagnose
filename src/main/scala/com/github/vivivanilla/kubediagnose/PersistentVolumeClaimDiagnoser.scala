@@ -42,25 +42,24 @@ class PersistentVolumeClaimDiagnoser(
     val client: ApiClient
 ) {
   val name = pvc.getMetadata.getName
-  val namespace = pvc.getMetadata.getName
+  val namespace = pvc.getMetadata.getNamespace
 
   def diagnose: IO[Markdown] =
     for {
-      status <- showStatus.recover { case e =>
-        MarkdownAlert(
-          "WARNING",
-          MarkdownParagraph(
-            s"Cannot read PersistentVolumeClaim status: ${e.getMessage}"
-          )
-        )
-      }
+      conditions <- showConditions
+      events <- showEvents
+      pvSpec <- showPersistentVolumeSpec
     } yield MarkdownBlocks(
       Seq(
         MarkdownHeading(s"PersistentVolumeClaim ${namespace}/${name}", 2),
         MarkdownParagraph("Specification:"),
         showSpec,
-        MarkdownParagraph("Status:"),
-        status
+        MarkdownParagraph("Conditions:"),
+        conditions,
+        MarkdownParagraph("Events:"),
+        events,
+        MarkdownParagraph("PersistentVolume Specification:"),
+        pvSpec
       )
     )
 
@@ -72,7 +71,7 @@ class PersistentVolumeClaimDiagnoser(
     MarkdownCode(Yaml.dump(pvc.metadata(metadata)), Some("yaml"))
   }
 
-  def showStatus: IO[Markdown] = {
+  def showConditions: IO[Markdown] = {
     val conditions = pvc.getStatus.getConditions.convertToScala
       .map(Condition.fromPersistentVolumeClaimCondition)
     val tableRowsIO = conditions.map(condition =>
@@ -90,18 +89,27 @@ class PersistentVolumeClaimDiagnoser(
     )
     val tableRows = IO.parSequenceN(1)(tableRowsIO)
 
-    tableRows.map(rows =>
-      MarkdownTable(
-        Seq(
-          "Last probe",
-          "Last transition",
-          "Type",
-          "Status",
-          "Message",
-          "Reason"
-        ) +: rows
+    tableRows
+      .map(rows =>
+        MarkdownTable(
+          Seq(
+            "Last probe",
+            "Last transition",
+            "Type",
+            "Status",
+            "Message",
+            "Reason"
+          ) +: rows
+        )
       )
-    )
+      .recover { case e =>
+        MarkdownAlert(
+          "WARNING",
+          MarkdownParagraph(
+            s"Cannot read PersistentVolumeClaim status: ${e.getMessage}"
+          )
+        )
+      }
   }
 
   def showPersistentVolumeSpec: IO[Markdown] = for {
@@ -114,6 +122,23 @@ class PersistentVolumeClaimDiagnoser(
       )
     case Right(pv) => MarkdownCode(Yaml.dump(pv), Some("yaml"))
   }
+
+  def showEvents: IO[Markdown] = for {
+    diagnoser <- EventsDiagnoser.forInvolvedObject(
+      "v1",
+      "PersistentVolumeClaim",
+      name,
+      namespace
+    )(client)
+    diagnoses <- diagnoser.diagnoseSingleObject.recover { case e =>
+      MarkdownAlert(
+        "WARNING",
+        MarkdownParagraph(
+          s"Cannot read Events for PersistentVolumeClaim status: ${e.getMessage}"
+        )
+      )
+    }
+  } yield diagnoses
 
   def persistentVolume: IO[V1PersistentVolume] =
     for {
